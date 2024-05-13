@@ -1,0 +1,20 @@
+version: '3'
+services:
+  broker:
+    build: 
+      context: ./broker
+      dockerfile: ./broker.dockerfile
+    restart: always
+    ports:
+      - "8000:8000"
+    deploy:
+      mode: replicated
+      replicas: 1
+  hasher:
+    build:
+      context: ./hasher
+      dockerfile: ./hasher.dockerfile
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 1
