@@ -60,12 +60,6 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 	var jsresp JsonResponse
 	jsresp.Error = false
 	jsresp.Text = mes.Text
-	// js, err := json.Marshal(jsresp)
-	// if err != nil {
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// 	w.Write([]byte("Failed to marshal message"))
-	// 	return
-	// }
 	templ := template.Must(template.ParseFiles("./templates/textblock.html.gohtml"))
 	templ.ExecuteTemplate(w, "index", jsresp)
 }

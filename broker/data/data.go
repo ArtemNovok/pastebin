@@ -8,12 +8,23 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var client *mongo.Client
 
 func NewClient(cl *mongo.Client) {
 	client = cl
+	index := mongo.IndexModel{
+		Keys:    bson.D{{"TimeToLive", 1}},
+		Options: options.Index().SetExpireAfterSeconds(0),
+	}
+	coll := client.Database("mes").Collection("mes")
+	name, err := coll.Indexes().CreateOne(context.TODO(), index)
+	if err != nil {
+		log.Panic(err)
+	}
+	log.Printf("Index %s was created", name)
 }
 
 var rediscl *redis.Client
@@ -54,10 +65,6 @@ func GetByKey(hash string) (Message, error) {
 	res, err := rediscl.Get(ctx, hash).Result()
 	if err != nil {
 		return Message{}, err
-	}
-	err = rediscl.Expire(ctx, hash, time.Second*20).Err()
-	if err != nil {
-		log.Println("failed to restore expire on cache")
 	}
 	mes.Text = res
 	return mes, nil

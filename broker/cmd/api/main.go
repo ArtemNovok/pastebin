@@ -44,17 +44,18 @@ func ConnectTOMongoDB(url string) *mongo.Client {
 	count := 0
 	for {
 		client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(url))
+		err = client.Ping(context.TODO(), nil)
 		if err == nil {
-			log.Println("Successfully connected to mongodb")
+			log.Println("successfully connected to mongodb")
 			return client
 		}
 		if count >= 8 {
 			log.Panic(err)
-			log.Panic("Failed to connect to Mongodb")
+			log.Panic("failed to connect to Mongodb")
 			break
 		}
 		count++
-		log.Println("Backing off for 2 seconds...")
+		log.Println("backing off for 2 seconds...")
 		time.Sleep(time.Second * 2)
 	}
 	return nil
@@ -70,16 +71,16 @@ func ConnectTORedis(adr string) *redis.Client {
 		})
 		err := rediscl.Ping(context.TODO()).Err()
 		if err == nil {
-			log.Println("Successfully connected to redis")
+			log.Println("successfully connected to redis")
 			return rediscl
 		}
 		if count >= 8 {
 			log.Panic(err)
-			log.Panic("Failed to connect to Mongodb")
+			log.Panic("failed to connect to redis")
 			break
 		}
 		count++
-		log.Println("Backing off for 2 seconds...")
+		log.Println("backing off for 2 seconds...")
 		time.Sleep(time.Second * 2)
 	}
 	return nil
