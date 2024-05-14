@@ -14,8 +14,8 @@ import (
 
 type Config struct{}
 
-const mongoUrl = "mongodb://localhost:27017"
-const redisAdr = "localhost:6379"
+const mongoUrl = "mongodb://mongo"
+const redisAdr = "redis:6379"
 
 func main() {
 	app := Config{}

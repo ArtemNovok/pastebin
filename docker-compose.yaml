@@ -18,3 +18,16 @@ services:
     deploy:
       mode: replicated
       replicas: 1
+  mongo:
+    image: mongo
+    restart: always
+  
+  redis:
+    image: redis
+    restart: always
+
+  postgres:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: mysecretpassword

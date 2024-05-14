@@ -3,6 +3,7 @@ package main
 import (
 	"broker/data"
 	"bytes"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -22,8 +23,11 @@ type JsonResponse struct {
 	Text  string `json:"text"`
 }
 
+//go:embed templates/*
+var templateFS embed.FS
+
 func (app *Config) HandleGetMainPage(w http.ResponseWriter, r *http.Request) {
-	templ := template.Must(template.ParseFiles("./templates/main.html.gohtml"))
+	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 	templ.ExecuteTemplate(w, "index", nil)
 }
 
@@ -35,7 +39,7 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 		var js JsonResponse
 		js.Error = false
 		js.Text = mes.Text
-		templ := template.Must(template.ParseFiles("./templates/textblock.html.gohtml"))
+		templ := template.Must(template.ParseFS(templateFS, "templates/textblock.html.gohtml"))
 		templ.ExecuteTemplate(w, "index", js)
 		return
 	}
@@ -43,7 +47,7 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 	mes, err = data.FindMesByHash(hash)
 	if err == mongo.ErrNoDocuments {
 		w.WriteHeader(http.StatusOK)
-		templ := template.Must(template.ParseFiles("./templates/main.html.gohtml"))
+		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 		templ.ExecuteTemplate(w, "notFound", nil)
 		return
 	}
@@ -60,7 +64,7 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 	var jsresp JsonResponse
 	jsresp.Error = false
 	jsresp.Text = mes.Text
-	templ := template.Must(template.ParseFiles("./templates/textblock.html.gohtml"))
+	templ := template.Must(template.ParseFS(templateFS, "templates/textblock.html.gohtml"))
 	templ.ExecuteTemplate(w, "index", jsresp)
 }
 
@@ -79,7 +83,7 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	mes.HTL = int64(htl)
 	log.Println(mes)
-	req, err := http.NewRequest("POST", "http://localhost:80/hash", bytes.NewBuffer(nil))
+	req, err := http.NewRequest("POST", "http://hasher/hash", bytes.NewBuffer(nil))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -111,7 +115,7 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	mes.Hash = fmt.Sprintf("http://localhost:8000/mess%s", mes.Hash)
-	templ := template.Must(template.ParseFiles("./templates/main.html.gohtml"))
+	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 	templ.ExecuteTemplate(w, "link", mes)
 
 }
