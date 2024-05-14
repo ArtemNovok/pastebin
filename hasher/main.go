@@ -24,7 +24,7 @@ type JsonRequest struct {
 	Hash string `json:"hash" bson:"hash"`
 }
 
-const postgresurl = "host=host.docker.internal port=5432 user=postgres password=mysecretpassword dbname=postgres sslmode=disable timezone=UTC connect_timeout=5"
+const postgresurl = "host=localhost port=5432 user=postgres password=mysecretpassword dbname=postgres sslmode=disable timezone=UTC connect_timeout=5"
 
 func main() {
 	mux := chi.NewMux()

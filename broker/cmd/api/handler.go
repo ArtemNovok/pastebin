@@ -3,7 +3,6 @@ package main
 import (
 	"broker/data"
 	"bytes"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -15,9 +14,6 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-//go:embed templates/*
-var templatesFS embed.FS
-
 type JsonRequest struct {
 	Hash string `json:"hash" bson:"hash"`
 }
@@ -27,16 +23,27 @@ type JsonResponse struct {
 }
 
 func (app *Config) HandleGetMainPage(w http.ResponseWriter, r *http.Request) {
-	templ := template.Must(template.ParseFS(templatesFS, "templates/main.html.gohtml"))
+	templ := template.Must(template.ParseFiles("./templates/main.html.gohtml"))
 	templ.ExecuteTemplate(w, "index", nil)
 }
 
 func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 	hash := chi.URLParam(r, "hash")
-	mes, err := data.FindMesByHash(hash)
+	mes, err := data.GetByKey(hash)
+	if err == nil {
+		log.Println("found via redis")
+		var js JsonResponse
+		js.Error = false
+		js.Text = mes.Text
+		templ := template.Must(template.ParseFiles("./templates/textblock.html.gohtml"))
+		templ.ExecuteTemplate(w, "index", js)
+		return
+	}
+	//----------------------via mongo--------------------
+	mes, err = data.FindMesByHash(hash)
 	if err == mongo.ErrNoDocuments {
 		w.WriteHeader(http.StatusOK)
-		templ := template.Must(template.ParseFS(templatesFS, "templates/main.html.gohtml"))
+		templ := template.Must(template.ParseFiles("./templates/main.html.gohtml"))
 		templ.ExecuteTemplate(w, "notFound", nil)
 		return
 	}
@@ -45,6 +52,11 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Error!"))
 		return
 	}
+	err = mes.SetMes()
+	if err != nil {
+		log.Println("Error during update cache")
+	}
+	log.Println("found via mongodb")
 	var jsresp JsonResponse
 	jsresp.Error = false
 	jsresp.Text = mes.Text
@@ -54,7 +66,7 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 	// 	w.Write([]byte("Failed to marshal message"))
 	// 	return
 	// }
-	templ := template.Must(template.ParseFS(templatesFS, "templates/textblock.html.gohtml"))
+	templ := template.Must(template.ParseFiles("./templates/textblock.html.gohtml"))
 	templ.ExecuteTemplate(w, "index", jsresp)
 }
 
@@ -73,7 +85,7 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	mes.HTL = int64(htl)
 	log.Println(mes)
-	req, err := http.NewRequest("POST", "http://hasher/hash", bytes.NewBuffer(nil))
+	req, err := http.NewRequest("POST", "http://localhost:80/hash", bytes.NewBuffer(nil))
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -105,7 +117,7 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	mes.Hash = fmt.Sprintf("http://localhost:8000/mess%s", mes.Hash)
-	templ := template.Must(template.ParseFS(templatesFS, "templates/main.html.gohtml"))
+	templ := template.Must(template.ParseFiles("./templates/main.html.gohtml"))
 	templ.ExecuteTemplate(w, "link", mes)
 
 }

@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Config struct{}
 
-const mongoUrl = "mongodb://host.docker.internal:27017"
+const mongoUrl = "mongodb://localhost:27017"
+const redisAdr = "localhost:6379"
 
 func main() {
 	app := Config{}
@@ -22,8 +24,17 @@ func main() {
 		Handler: app.routes(),
 	}
 	client := ConnectTOMongoDB(mongoUrl)
+
+	rediscl := ConnectTORedis(redisAdr)
+
+	defer rediscl.Close()
+
+	data.NewRedisClient(rediscl)
+
 	data.NewClient(client)
+
 	err := server.ListenAndServe()
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -36,6 +47,31 @@ func ConnectTOMongoDB(url string) *mongo.Client {
 		if err == nil {
 			log.Println("Successfully connected to mongodb")
 			return client
+		}
+		if count >= 8 {
+			log.Panic(err)
+			log.Panic("Failed to connect to Mongodb")
+			break
+		}
+		count++
+		log.Println("Backing off for 2 seconds...")
+		time.Sleep(time.Second * 2)
+	}
+	return nil
+}
+
+func ConnectTORedis(adr string) *redis.Client {
+	count := 0
+	for {
+		rediscl := redis.NewClient(&redis.Options{
+			Addr:     adr,
+			Password: "",
+			DB:       0,
+		})
+		err := rediscl.Ping(context.TODO()).Err()
+		if err == nil {
+			log.Println("Successfully connected to redis")
+			return rediscl
 		}
 		if count >= 8 {
 			log.Panic(err)
