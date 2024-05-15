@@ -29,7 +29,18 @@
 {{end}}
 {{block "link" .}}
 <div class="text-center">
+    {{if .Error }}
+    <h2>Error processing request</h2>
+    <h3>Potential reasons</h3>
+    <h4>Failed to get response from second microservice</h4>
+    <h4>You entered blank text</h4>
+    <h4>You entered non numeric value in time to live field</h4>
+    <hr>
+    <h3>Please try another time!</h3>
+    <a href="http://localhost:8000/"> <button class="btn btn-primary">Go to main page</button></a>
+    {{else}}
     <a href="{{.Hash}}">{{.Hash}}</a>
+    {{end}}
 </div>
 {{end}}
 

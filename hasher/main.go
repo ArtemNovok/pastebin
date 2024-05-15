@@ -36,6 +36,7 @@ func main() {
 		Handler: mux,
 	}
 	db := ConnectToDb(postgresurl)
+	defer db.Close()
 	data.NewDb(db)
 	data.CreateTable()
 	err := srv.ListenAndServe()

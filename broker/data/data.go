@@ -34,10 +34,11 @@ func NewRedisClient(cl *redis.Client) {
 }
 
 type Message struct {
-	ID   string `json:"id,omitempty" bson:"_id"`
-	Text string `json:"text" bson:"text"`
-	Hash string `json:"hash,omitempty" bson:"hash,omitempty"`
-	HTL  int64  `json:"htl,omitempty" bson:"htl"`
+	ID    string `json:"id,omitempty" bson:"_id"`
+	Text  string `json:"text" bson:"text"`
+	Hash  string `json:"hash,omitempty" bson:"hash,omitempty"`
+	HTL   int64  `json:"htl,omitempty" bson:"htl"`
+	Error bool
 }
 
 func (m *Message) InsertMes() error {

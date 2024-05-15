@@ -3,17 +3,25 @@ package main
 import (
 	"broker/data"
 	"bytes"
+	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+type ChanStruct struct {
+	JsReq JsonRequest
+	Error error
+}
 
 type JsonRequest struct {
 	Hash string `json:"hash" bson:"hash"`
@@ -72,45 +80,41 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	var mes data.Message
 	mes.Text = r.FormValue("text")
 	ttl := r.FormValue("htl")
+	if mes.Text == "" || ttl == "0" {
+		w.WriteHeader(http.StatusOK)
+		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+		mes.Error = true
+		templ.ExecuteTemplate(w, "link", mes)
+		return
+	}
 	log.Println(mes.Text)
 	log.Println(ttl)
 	htl, err := strconv.Atoi(ttl)
 	if err != nil {
 		log.Println(err)
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Failed to decode message"))
+		w.WriteHeader(http.StatusOK)
+		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+		mes.Error = true
+		templ.ExecuteTemplate(w, "link", mes)
 		return
 	}
 	mes.HTL = int64(htl)
-	log.Println(mes)
-	req, err := http.NewRequest("POST", "http://hasher/hash", bytes.NewBuffer(nil))
+	resp, err := MakeRequest(r)
 	if err != nil {
 		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed to connect  to hash service"))
-		return
-	}
-	client := http.Client{}
-	res, err := client.Do(req)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed to connect  to hash service"))
-		return
-	}
-	defer res.Body.Close()
-	var resp JsonRequest
-	err = json.NewDecoder(res.Body).Decode(&resp)
-	if err != nil {
-		log.Println(err)
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed to decode response from hasher "))
+		w.WriteHeader(http.StatusOK)
+		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+		mes.Error = true
+		templ.ExecuteTemplate(w, "link", mes)
 		return
 	}
 	mes.Hash = resp.Hash
 	if err = mes.InsertMes(); err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed to save message to db"))
+		log.Println(err)
+		w.WriteHeader(http.StatusOK)
+		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+		mes.Error = true
+		templ.ExecuteTemplate(w, "link", mes)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -118,4 +122,48 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 	templ.ExecuteTemplate(w, "link", mes)
 
+}
+
+func GetHashFromHasher() (*JsonRequest, error) {
+	req, err := http.NewRequest("POST", "http://hasher/hash", bytes.NewBuffer(nil))
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	client := http.Client{}
+	res, err := client.Do(req)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	defer res.Body.Close()
+	var resp JsonRequest
+	err = json.NewDecoder(res.Body).Decode(&resp)
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	return &resp, nil
+}
+
+func MakeRequest(r *http.Request) (*JsonRequest, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Millisecond*200)
+	defer cancel()
+
+	respch := make(chan ChanStruct)
+	go func() {
+		resp, err := GetHashFromHasher()
+		respch <- ChanStruct{
+			JsReq: *resp,
+			Error: err,
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, errors.New("request from hasher took to much time")
+		case chresp := <-respch:
+			return &chresp.JsReq, chresp.Error
+		}
+	}
 }
