@@ -3,10 +3,8 @@ package main
 import (
 	"encoding/json"
 	"hasher/data"
+	"log"
 	"net/http"
-	"strconv"
-
-	"github.com/shomali11/util/xhashes"
 )
 
 type JsonRequest struct {
@@ -14,20 +12,32 @@ type JsonRequest struct {
 }
 
 func (app *Config) GetHash(w http.ResponseWriter, r *http.Request) {
-	var req JsonRequest
-	num, err := data.GetNum()
+	hash, err := data.GetDelKey()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("unable to get num from db"))
+		w.Write([]byte("Failed to get hash from redis"))
 		return
 	}
-	hs := strconv.FormatUint(uint64(xhashes.FNV32(string(num))), 10)
-	req.Hash = hs
-	js, err := json.Marshal(req)
+	var resp JsonRequest
+	resp.Hash = hash
+	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Failed to hash"))
+		w.Write([]byte("Failed to marshal response"))
+		return
 	}
-	w.WriteHeader(http.StatusAccepted)
-	w.Write(js)
+	w.WriteHeader(http.StatusOK)
+	size, err := data.GetDBSize()
+	if err != nil {
+		log.Panic(err)
+		return
+	}
+	if size < 20 {
+		go data.GenerateHashes()
+		// if err != nil {
+		// 	log.Panic(err)
+		// 	return
+		// }
+	}
+
 }

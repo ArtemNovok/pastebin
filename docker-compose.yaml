@@ -26,6 +26,10 @@ services:
     image: redis
     restart: always
 
+  redis2:
+    image: redis
+    restart: always
+
   postgres:
     image: postgres
     restart: always
