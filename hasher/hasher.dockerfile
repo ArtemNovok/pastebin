@@ -6,7 +6,7 @@ WORKDIR /app
 
 COPY .  /app
 
-RUN CGO_ENABLED=0  go build -o hasherApp .
+RUN CGO_ENABLED=0  go build -o hasherApp ./cmd/api
 
 RUN chmod +x /app/hasherApp
 
