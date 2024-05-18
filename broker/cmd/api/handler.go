@@ -96,6 +96,18 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	var mes data.Message
+	reqdata := r.Context().Value("userdata").(ReqUserData)
+	if reqdata.UserData["Authorized"] == "0" {
+		w.WriteHeader(http.StatusOK)
+		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+		mes.Error = true
+		templ.ExecuteTemplate(w, "link", mes)
+		return
+	}
+	id := reqdata.UserData["Id"]
+	username := reqdata.UserData["Username"]
+	log.Println(id)
+	log.Println(username)
 	mes.Text = r.FormValue("text")
 	ttl := r.FormValue("htl")
 	if mes.Text == "" || ttl == "0" {
@@ -190,6 +202,7 @@ func (app *Config) HandleSignIn(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	username := r.FormValue("username")
+
 	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 	var errResp JsonAuthResponse
 	errResp.Error = true
@@ -207,17 +220,9 @@ func (app *Config) HandleSignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	templ.ExecuteTemplate(w, "login", resp)
-	// err = json.NewEncoder(w).Encode(resp)
-	// if err != nil {
-	// 	log.Println(err)
-	// 	w.WriteHeader(http.StatusInternalServerError)
-	// 	w.Write([]byte("Failed to encode response"))
-	// 	return
-	// }
-	// w.WriteHeader(http.StatusAccepted)
 }
 
-func CreateUser(email, username, password string) (JsonAuthResponse, error) {
+func CreateUser(email, password, username string) (JsonAuthResponse, error) {
 	reqdata := User{
 		Email:    email,
 		Password: password,
@@ -296,29 +301,25 @@ func LogInUser(email, password string) (JsonAuthResponse, error) {
 	}
 	payload, err := json.Marshal(reqdata)
 	if err != nil {
-		log.Println(err)
-		log.Println("0")
+
 		return JsonAuthResponse{}, err
 	}
 	requsest, err := http.NewRequest("POST", "http://auth/login", bytes.NewBuffer(payload))
 	if err != nil {
-		log.Println(err)
-		log.Println("1")
+
 		return JsonAuthResponse{}, err
 	}
 	client := &http.Client{}
 	response, err := client.Do(requsest)
 	if err != nil {
-		log.Println(err)
-		log.Println("2")
+
 		return JsonAuthResponse{}, err
 	}
 	defer response.Body.Close()
 	var jsResponse JsonAuthResponse
 	err = json.NewDecoder(response.Body).Decode(&jsResponse)
 	if err != nil {
-		log.Println(err)
-		log.Println("3")
+
 		return JsonAuthResponse{}, err
 	}
 	return jsResponse, err

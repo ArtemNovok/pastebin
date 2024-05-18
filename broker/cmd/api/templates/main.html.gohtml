@@ -118,7 +118,7 @@
         <h1>PasteBin</h1> 
     </div>
     <div id="form1" class="m-3">
-        <form  hx-target="#form1" hx-post="/mes" hx-headers='{"Authorization":{{.Token}}}'
+        <form  hx-target="#form1" hx-post="/mes" hx-headers='{"Authorization":"{{.Token}}"}'
         class="d-flex  flex-column align-items-center justify-content-center gap-5">
             <textarea name="text" id="text" cols="100" rows="30"></textarea>
             <div>

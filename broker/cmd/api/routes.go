@@ -11,7 +11,7 @@ func (app *Config) routes() http.Handler {
 	mux := chi.NewRouter()
 	mux.Use(middleware.Recoverer)
 
-	mux.Post("/mes", app.HandlePostMessage)
+	mux.With(app.ValidateRequest).Post("/mes", app.HandlePostMessage)
 	mux.Get("/mess{hash}", app.GetHandler)
 	mux.Get("/", app.HandleGetMainPage)
 	mux.Get("/sgform", app.HandleGetSgForm)

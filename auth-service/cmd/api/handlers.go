@@ -32,6 +32,7 @@ func (app *Config) HandleSignUp(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "Empty user or password or username fields")
 		return
 	}
+
 	hashedPass, err := bcrypt.GenerateFromPassword([]byte(user.Password), 10)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError, "Failed to generate hash from password")
@@ -68,6 +69,7 @@ func (app *Config) HandlerLogIn(w http.ResponseWriter, r *http.Request) {
 		WriteError(w, http.StatusBadRequest, "Empty email or password fields")
 		return
 	}
+
 	new_user, err := user.GetUserByEmail()
 	if err == sql.ErrNoRows {
 		log.Println("3")
