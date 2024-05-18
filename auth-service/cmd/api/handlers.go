@@ -60,30 +60,25 @@ func (app *Config) HandlerLogIn(w http.ResponseWriter, r *http.Request) {
 	var user data.User
 	log.Println("Handled login")
 	if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
-		log.Println("1")
 		WriteError(w, http.StatusBadRequest, "Failed to decode request body")
 		return
 	}
 	if user.Email == "" || user.Password == "" {
-		log.Println("2")
 		WriteError(w, http.StatusBadRequest, "Empty email or password fields")
 		return
 	}
 
 	new_user, err := user.GetUserByEmail()
 	if err == sql.ErrNoRows {
-		log.Println("3")
 		WriteError(w, http.StatusNotFound, "User doesn't exists")
 		return
 	}
 	if err != nil {
-		log.Println("4")
 		WriteError(w, http.StatusInternalServerError, "Failed find user")
 		return
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(new_user.Password), []byte(user.Password))
 	if err != nil {
-		log.Println("5")
 		WriteError(w, http.StatusBadRequest, "Incorrect password")
 		return
 	}

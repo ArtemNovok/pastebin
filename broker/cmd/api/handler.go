@@ -45,8 +45,10 @@ type JsonHashRequest struct {
 	Hash string `json:"hash" bson:"hash"`
 }
 type JsonResponse struct {
-	Error bool   `json:"error"`
-	Text  string `json:"text"`
+	Error    bool   `json:"error"`
+	Text     string `json:"text"`
+	Username string `json:"username"`
+	UserId   int64  `json:"userid"`
 }
 
 //go:embed templates/*
@@ -65,6 +67,8 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 		var js JsonResponse
 		js.Error = false
 		js.Text = mes.Text
+		js.UserId = mes.UserId
+		js.Username = mes.UserName
 		templ := template.Must(template.ParseFS(templateFS, "templates/textblock.html.gohtml"))
 		templ.ExecuteTemplate(w, "index", js)
 		return
@@ -84,12 +88,14 @@ func (app *Config) GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	err = mes.SetMes()
 	if err != nil {
-		log.Println("Error during update cache")
+		log.Println("Error during cache update ")
 	}
 	log.Println("found via mongodb")
 	var jsresp JsonResponse
 	jsresp.Error = false
 	jsresp.Text = mes.Text
+	jsresp.UserId = mes.UserId
+	jsresp.Username = mes.UserName
 	templ := template.Must(template.ParseFS(templateFS, "templates/textblock.html.gohtml"))
 	templ.ExecuteTemplate(w, "index", jsresp)
 }
@@ -108,6 +114,16 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	username := reqdata.UserData["Username"]
 	log.Println(id)
 	log.Println(username)
+	intId, err := strconv.Atoi(id)
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+		mes.Error = true
+		templ.ExecuteTemplate(w, "link", mes)
+		return
+	}
+	mes.UserId = int64(intId)
+	mes.UserName = username
 	mes.Text = r.FormValue("text")
 	ttl := r.FormValue("htl")
 	if mes.Text == "" || ttl == "0" {
@@ -117,11 +133,8 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 		templ.ExecuteTemplate(w, "link", mes)
 		return
 	}
-	log.Println(mes.Text)
-	log.Println(ttl)
 	htl, err := strconv.Atoi(ttl)
 	if err != nil {
-		log.Println(err)
 		w.WriteHeader(http.StatusOK)
 		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 		mes.Error = true
@@ -131,7 +144,6 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	mes.HTL = int64(htl)
 	resp, err := MakeHashRequest(r)
 	if err != nil {
-		log.Println(err)
 		w.WriteHeader(http.StatusOK)
 		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 		mes.Error = true
@@ -140,7 +152,6 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	mes.Hash = resp.Hash
 	if err = mes.InsertMes(); err != nil {
-		log.Println(err)
 		w.WriteHeader(http.StatusOK)
 		templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
 		mes.Error = true
@@ -157,13 +168,11 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 func GetHashFromHasher() (*JsonHashRequest, error) {
 	req, err := http.NewRequest("POST", "http://hasher/hash", bytes.NewBuffer(nil))
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 	client := http.Client{}
 	res, err := client.Do(req)
 	if err != nil {
-		log.Println(err)
 		return nil, err
 	}
 	defer res.Body.Close()
@@ -230,29 +239,25 @@ func CreateUser(email, password, username string) (JsonAuthResponse, error) {
 	}
 	payload, err := json.Marshal(reqdata)
 	if err != nil {
-		log.Println(err)
-		log.Println("0")
+
 		return JsonAuthResponse{}, err
 	}
 	requsest, err := http.NewRequest("POST", "http://auth/signup", bytes.NewBuffer(payload))
 	if err != nil {
-		log.Println(err)
-		log.Println("1")
+
 		return JsonAuthResponse{}, err
 	}
 	client := &http.Client{}
 	response, err := client.Do(requsest)
 	if err != nil {
-		log.Println(err)
-		log.Println("2")
+
 		return JsonAuthResponse{}, err
 	}
 	defer response.Body.Close()
 	var jsResponse JsonAuthResponse
 	err = json.NewDecoder(response.Body).Decode(&jsResponse)
 	if err != nil {
-		log.Println(err)
-		log.Println("3")
+
 		return JsonAuthResponse{}, err
 	}
 	return jsResponse, err
