@@ -14,5 +14,9 @@ func (app *Config) routes() http.Handler {
 	mux.Post("/mes", app.HandlePostMessage)
 	mux.Get("/mess{hash}", app.GetHandler)
 	mux.Get("/", app.HandleGetMainPage)
+	mux.Get("/sgform", app.HandleGetSgForm)
+	mux.Get("/logform", app.HandleGetLogForm)
+	mux.Post("/signin", app.HandleSignIn)
+	mux.Post("/login", app.HandleLogInRequest)
 	return mux
 }

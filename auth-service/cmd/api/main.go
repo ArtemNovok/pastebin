@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	webPort     = "8080"
-	postgresUrl = "host=localhost port=5432 user=postgres password=mysecretpassword dbname=postgres sslmode=disable timezone=UTC connect_timeout=5"
+	webPort     = "80"
+	postgresUrl = "host=postgres2 user=postgres password=mysecretpassword dbname=postgres sslmode=disable timezone=UTC connect_timeout=5"
 )
 
 type Config struct{}

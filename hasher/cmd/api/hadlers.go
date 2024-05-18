@@ -20,13 +20,13 @@ func (app *Config) GetHash(w http.ResponseWriter, r *http.Request) {
 	}
 	var resp JsonRequest
 	resp.Hash = hash
+	w.WriteHeader(http.StatusOK)
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte("Failed to marshal response"))
 		return
 	}
-	w.WriteHeader(http.StatusOK)
 	size, err := data.GetDBSize()
 	if err != nil {
 		log.Panic(err)
@@ -34,10 +34,6 @@ func (app *Config) GetHash(w http.ResponseWriter, r *http.Request) {
 	}
 	if size < 20 {
 		go data.GenerateHashes()
-		// if err != nil {
-		// 	log.Panic(err)
-		// 	return
-		// }
 	}
 
 }

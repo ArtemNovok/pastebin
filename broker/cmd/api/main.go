@@ -3,6 +3,7 @@ package main
 import (
 	"broker/data"
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -14,13 +15,16 @@ import (
 
 type Config struct{}
 
-const mongoUrl = "mongodb://mongo"
-const redisAdr = "redis:6379"
+const (
+	mongoUrl = "mongodb://mongo"
+	webPort  = "8000"
+	redisAdr = "redis:6379"
+)
 
 func main() {
 	app := Config{}
 	server := &http.Server{
-		Addr:    ":8000",
+		Addr:    fmt.Sprintf(":%s", webPort),
 		Handler: app.routes(),
 	}
 	client := ConnectTOMongoDB(mongoUrl)

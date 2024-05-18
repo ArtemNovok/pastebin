@@ -18,12 +18,30 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type ChanStruct struct {
-	JsReq JsonRequest
+type ChanHashStruct struct {
+	JsReq JsonHashRequest
 	Error error
 }
 
-type JsonRequest struct {
+type ChanAuthStruct struct {
+	JsReq JsonAuthResponse
+	Error error
+}
+
+type User struct {
+	Id       int64  `json:"id,omitempty"`
+	UserName string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type JsonAuthResponse struct {
+	Error   bool   `json:"error"`
+	Message string `json:"message"`
+	Token   string `json:"token,omitempty"`
+}
+
+type JsonHashRequest struct {
 	Hash string `json:"hash" bson:"hash"`
 }
 type JsonResponse struct {
@@ -99,7 +117,7 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	mes.HTL = int64(htl)
-	resp, err := MakeRequest(r)
+	resp, err := MakeHashRequest(r)
 	if err != nil {
 		log.Println(err)
 		w.WriteHeader(http.StatusOK)
@@ -124,7 +142,7 @@ func (app *Config) HandlePostMessage(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func GetHashFromHasher() (*JsonRequest, error) {
+func GetHashFromHasher() (*JsonHashRequest, error) {
 	req, err := http.NewRequest("POST", "http://hasher/hash", bytes.NewBuffer(nil))
 	if err != nil {
 		log.Println(err)
@@ -137,7 +155,7 @@ func GetHashFromHasher() (*JsonRequest, error) {
 		return nil, err
 	}
 	defer res.Body.Close()
-	var resp JsonRequest
+	var resp JsonHashRequest
 	err = json.NewDecoder(res.Body).Decode(&resp)
 	if err != nil {
 		log.Println(err)
@@ -146,14 +164,14 @@ func GetHashFromHasher() (*JsonRequest, error) {
 	return &resp, nil
 }
 
-func MakeRequest(r *http.Request) (*JsonRequest, error) {
+func MakeHashRequest(r *http.Request) (*JsonHashRequest, error) {
 	ctx, cancel := context.WithTimeout(r.Context(), time.Millisecond*200)
 	defer cancel()
 
-	respch := make(chan ChanStruct)
+	respch := make(chan ChanHashStruct)
 	go func() {
 		resp, err := GetHashFromHasher()
-		respch <- ChanStruct{
+		respch <- ChanHashStruct{
 			JsReq: *resp,
 			Error: err,
 		}
@@ -166,4 +184,195 @@ func MakeRequest(r *http.Request) (*JsonRequest, error) {
 			return &chresp.JsReq, chresp.Error
 		}
 	}
+}
+
+func (app *Config) HandleSignIn(w http.ResponseWriter, r *http.Request) {
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	username := r.FormValue("username")
+	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+	var errResp JsonAuthResponse
+	errResp.Error = true
+	if email == "" || password == "" || username == "" {
+		w.WriteHeader(http.StatusOK)
+		errResp.Message = "Invalid credentials!"
+		templ.ExecuteTemplate(w, "login", errResp)
+		return
+	}
+	resp, err := MakeSignInRequest(r, email, password, username)
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		errResp.Message = "Failed to save user try another time"
+		templ.ExecuteTemplate(w, "login", errResp)
+		return
+	}
+	templ.ExecuteTemplate(w, "login", resp)
+	// err = json.NewEncoder(w).Encode(resp)
+	// if err != nil {
+	// 	log.Println(err)
+	// 	w.WriteHeader(http.StatusInternalServerError)
+	// 	w.Write([]byte("Failed to encode response"))
+	// 	return
+	// }
+	// w.WriteHeader(http.StatusAccepted)
+}
+
+func CreateUser(email, username, password string) (JsonAuthResponse, error) {
+	reqdata := User{
+		Email:    email,
+		Password: password,
+		UserName: username,
+	}
+	payload, err := json.Marshal(reqdata)
+	if err != nil {
+		log.Println(err)
+		log.Println("0")
+		return JsonAuthResponse{}, err
+	}
+	requsest, err := http.NewRequest("POST", "http://auth/signup", bytes.NewBuffer(payload))
+	if err != nil {
+		log.Println(err)
+		log.Println("1")
+		return JsonAuthResponse{}, err
+	}
+	client := &http.Client{}
+	response, err := client.Do(requsest)
+	if err != nil {
+		log.Println(err)
+		log.Println("2")
+		return JsonAuthResponse{}, err
+	}
+	defer response.Body.Close()
+	var jsResponse JsonAuthResponse
+	err = json.NewDecoder(response.Body).Decode(&jsResponse)
+	if err != nil {
+		log.Println(err)
+		log.Println("3")
+		return JsonAuthResponse{}, err
+	}
+	return jsResponse, err
+
+}
+
+func MakeSignInRequest(r *http.Request, email, password, username string) (*JsonAuthResponse, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Millisecond*200)
+	defer cancel()
+
+	respch := make(chan ChanAuthStruct)
+	go func(email, password, username string) {
+		resp, err := CreateUser(email, password, username)
+		respch <- ChanAuthStruct{
+			JsReq: resp,
+			Error: err,
+		}
+	}(email, password, username)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, errors.New("called auth service took to much time")
+		case resp := <-respch:
+			return &resp.JsReq, resp.Error
+		}
+	}
+}
+
+func (app *Config) HandleGetSgForm(w http.ResponseWriter, r *http.Request) {
+	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+	w.WriteHeader(http.StatusOK)
+	templ.ExecuteTemplate(w, "sgform", nil)
+}
+
+func (app *Config) HandleGetLogForm(w http.ResponseWriter, r *http.Request) {
+	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+	w.WriteHeader(http.StatusOK)
+	templ.ExecuteTemplate(w, "logform", nil)
+}
+
+func LogInUser(email, password string) (JsonAuthResponse, error) {
+	reqdata := User{
+		Email:    email,
+		Password: password,
+	}
+	payload, err := json.Marshal(reqdata)
+	if err != nil {
+		log.Println(err)
+		log.Println("0")
+		return JsonAuthResponse{}, err
+	}
+	requsest, err := http.NewRequest("POST", "http://auth/login", bytes.NewBuffer(payload))
+	if err != nil {
+		log.Println(err)
+		log.Println("1")
+		return JsonAuthResponse{}, err
+	}
+	client := &http.Client{}
+	response, err := client.Do(requsest)
+	if err != nil {
+		log.Println(err)
+		log.Println("2")
+		return JsonAuthResponse{}, err
+	}
+	defer response.Body.Close()
+	var jsResponse JsonAuthResponse
+	err = json.NewDecoder(response.Body).Decode(&jsResponse)
+	if err != nil {
+		log.Println(err)
+		log.Println("3")
+		return JsonAuthResponse{}, err
+	}
+	return jsResponse, err
+
+}
+
+func MakeLogInRequest(r *http.Request, email, password string) (*JsonAuthResponse, error) {
+	ctx, cancel := context.WithTimeout(r.Context(), time.Millisecond*200)
+	defer cancel()
+
+	respch := make(chan ChanAuthStruct)
+	go func(email, password string) {
+		resp, err := LogInUser(email, password)
+		respch <- ChanAuthStruct{
+			JsReq: resp,
+			Error: err,
+		}
+	}(email, password)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, errors.New("called auth service took to much time")
+		case resp := <-respch:
+			return &resp.JsReq, resp.Error
+		}
+	}
+}
+
+func (app *Config) HandleLogInRequest(w http.ResponseWriter, r *http.Request) {
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	templ := template.Must(template.ParseFS(templateFS, "templates/main.html.gohtml"))
+	var errResp JsonAuthResponse
+	errResp.Error = true
+	if email == "" || password == "" {
+		w.WriteHeader(http.StatusOK)
+		errResp.Message = "Invalid credentials!"
+		templ.ExecuteTemplate(w, "logform", errResp)
+		return
+	}
+	resp, err := MakeLogInRequest(r, email, password)
+	if err != nil {
+		w.WriteHeader(http.StatusOK)
+		errResp.Message = "Invalid credentials!"
+		templ.ExecuteTemplate(w, "logform", errResp)
+		return
+	}
+	if resp.Error {
+		w.WriteHeader(http.StatusOK)
+		errResp.Message = "Invalid credentials!"
+		templ.ExecuteTemplate(w, "logform", errResp)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	templ.ExecuteTemplate(w, "newindex", resp)
 }
