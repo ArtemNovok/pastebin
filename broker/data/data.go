@@ -51,7 +51,7 @@ func (m *Message) InsertMes() error {
 		context.TODO(),
 		bson.D{{"text", m.Text},
 			{"hash", m.Hash},
-			{"TimeToLive", time.Now().UTC().Add(time.Second * time.Duration(m.HTL))},
+			{"TimeToLive", time.Now().UTC().Add(time.Hour * time.Duration(m.HTL))},
 			{"userid", m.UserId},
 			{"username", m.UserName}})
 	if err != nil {
